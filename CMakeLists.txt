@@ -22,74 +22,29 @@ endif()
 
 
 ### Add Library
-
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-
-
-FetchContent_Declare(
-  Eigen
-  GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-  GIT_TAG master
-  GIT_SHALLOW TRUE)
-set(EIGEN_BUILD_DOC OFF)
-# note: To disable eigen tests,
-# you should put this code in a add_subdirectory to avoid to change
-# BUILD_TESTING for your own project too since variables are directory
-# scoped
-set(BUILD_TESTING OFF)
-set(EIGEN_BUILD_PKGCONFIG OFF)
-set( OFF)
-
-# Get Catch2
-FetchContent_Declare(Catch2 URL
-https://github.com/catchorg/Catch2/archive/v2.13.7.zip)
-  # Use FetchContent to to download and make Catch2 part of our CMake build.
-  set(CATCH_INSTALL_HELPERS OFF)
-  set(CATCH_BUILD_EXAMPLES OFF)
-  set(CATCH_BUILD_EXTRA_TESTS OFF)
-  set(CATCH_BUILD_TESTING OFF)
-  set(CATCH_INSTALL_DOCS OFF)
-
-# Get Spectra
-FetchContent_Declare(Spectra
-GIT_REPOSITORY https://github.com/yixuan/spectra.git
-GIT_TAG 148d0190ff25c14fb26087250c10a8ba8975d85f # 1.0.0
-)
-
-# Get pybind11
-FetchContent_Declare(pybind11
-GIT_REPOSITORY https://github.com/pybind/pybind11.git
-GIT_TAG 787d2c88cafa4d07fb38c9519c485a86323cfcf4 # 2.7.1
-)
-
-
-if(!Eigen3_FOUND)
-FetchContent_MakeAvailable(Eigen Spectra Catch2 pybind11)
-else()
-FetchContent_MakeAvailable(Spectra Catch2 pybind11)
-endif()
-
+set(BUILD_TESTING OFF) # to avoid building eigen3 tests
+add_subdirectory(external)
 
 
 # Build the lib that contains algorithms that
 # We setup an alias of our library to what it would look like
 # after installed
-file(GLOB SOURCES "src/*.cxx")
-add_library(libsimulatable STATIC SOURCES)
+file(GLOB simulatable-src CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/src/*.cxx)
+message(STATUS "simulatable-src " simulatable-src)
+add_library(libsimulatable STATIC ${simulatable-src})
 add_library(Simulatable::libsimulatable ALIAS libsimulatable)
 
 
 # Specify the installable headers of the lib. By specifying the headers
 # as PUBLIC_HEADER
-file(GLOB INCLUDES "include/*.h")
+file(GLOB simulatable-include "include/*.h")
 set_target_properties(libsimulatable PROPERTIES
   PUBLIC_HEADER
-    INCLUDES
+    siulatable-include
   )
 
 #### Properties of our library
 
-find_package(Eigen3)
 
 # Setup dependencies
 
@@ -123,7 +78,7 @@ target_include_directories(libsimulatable PUBLIC
   )
 
 # State to consumers that at least C++14 is required to use our library
-target_compile_features(libsimulatable PUBLIC cxx_std_1)4
+target_compile_features(libsimulatable PUBLIC cxx_std_14)
 
 # State that we need our library built with position independent code so
 # that it can be consumed by a dynamic library (.so/.dylib/.dll)
@@ -131,10 +86,10 @@ set_target_properties(libsimulatable PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_PYTHON_BINDING "Build python binding with pybind11" OFF)
 if(BUILD_PYTHON_BINDING)
-  pybind11_add_module(pysimulatable src/Simulatable.cxx)
+  pybind11_add_module(pysimulatable python/Simulatable.cxx)
   set_target_properties(pysimulatable PROPERTIES
   PUBLIC_HEADER
-    INCLUDES
+    simulatable-include
   )
   target_link_libraries(pysimulatable PRIVATE Eigen3::Eigen Simulatable::libsimulatable)
   target_include_directories(pysimulatable PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
@@ -198,8 +153,8 @@ install(FILES
 ### Add Tests
 
 # Setup Catch2 for Tests
-option(BUILD_TESTING_BIN "Build testings with Catch2" ON)
-if(BUILD_TESTING_BIN)
+option(SIMULATABLE_BUILD_TESTING "Build testings with Catch2" ON)
+if(SIMULATABLE_BUILD_TESTING)
   # Use a glob that re-runs everytime we build to get all the
   # tests sources
   file(GLOB test-sources CONFIGURE_DEPENDS tests/*.cxx)
